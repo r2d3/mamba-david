@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.16)
 project(mamba LANGUAGES CXX HIP)
 
+set(CMAKE_HIP_ARCHITECTURES gfx1011)
+set(CMAKE_CXX_STANDARD 20)
 
 # Dependencies
 include(FetchContent)
@@ -18,20 +20,12 @@ macro(fetch_dependency name repo tag)
 endmacro()
 
 fetch_dependency(pybind11 https://github.com/pybind/pybind11.git stable)
-
-add_subdirectory(${pybind11_SOURCE_DIR})
+add_subdirectory(${pybind11_SOURCE_DIR} ${pybind11_BINARY_DIR})
 
 find_package(hip REQUIRED)
 
 add_executable(test mamba.cpp)
 target_link_libraries(test PRIVATE hip::device)
-target_include_directories(test PRIVATE
-  /data/src/pytorch
-  /data/src/pytorch/torch/csrc/api/include
-  /data/src/pytorch/aten/src
-)
-target_compile_definitions(test PRIVATE C10_USING_CUSTOM_GENERATED_MACROS)
-
 set_source_files_properties(mamba.cpp PROPERTIES LANGUAGE HIP)
 
 pybind11_add_module(mamba mamba_python.cpp)

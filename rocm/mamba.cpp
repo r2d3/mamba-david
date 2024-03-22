@@ -3,7 +3,14 @@
 #include <vector>
 #include <hip/hip_runtime.h>
 
-#include <torch/extension.h>
+#include "selective_scan_fwd_kernel.cuh"
+
+template<typename input_t, typename weight_t>
+void selective_scan_fwd_cuda(SSMParamsBase& params, hipStream_t stream)
+{
+}
+
+template void selective_scan_fwd_cuda<float, float>(SSMParamsBase& params, hipStream_t stream);
 
 #define CHECK_HIP(expr) do {              \
   hipError_t result = (expr);             \
