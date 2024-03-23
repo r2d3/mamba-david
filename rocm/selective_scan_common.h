@@ -9,6 +9,8 @@
 #if 0
 #include <cuda_bf16.h>
 #include <cuda_fp16.h>
+#endif
+
 #include <c10/util/complex.h>  // For scalar_value_type
 
 using complex_t = c10::complex<float>;
@@ -24,7 +26,6 @@ inline __device__ float3 operator+(const float3 &a, const float3 &b) {
 inline __device__ float4 operator+(const float4 & a, const float4 & b){
     return {a.x + b.x, a.y + b.y, a.z + b.z, a.w + b.w};
 }
-#endif
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<int BYTES> struct BytesToType {};
@@ -55,7 +56,6 @@ template<> struct BytesToType<1> {
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-#if 0
 
 template<typename scalar_t, int N>
 struct Converter{
@@ -106,7 +106,6 @@ __device__ __forceinline__ complex_t cexpf(complex_t z) {
     sincosf(z.imag_, &s, &c);
     return complex_t(c * t, s * t);
 }
-#endif
 
 template<typename scalar_t> struct SSMScanOp;
 
@@ -117,7 +116,6 @@ struct SSMScanOp<float> {
     }
 };
 
-#if 0
 template<>
 struct SSMScanOp<complex_t> {
     __device__ __forceinline__ float4 operator()(const float4 &ab0, const float4 &ab1) const {
@@ -130,7 +128,6 @@ struct SSMScanOp<complex_t> {
         return make_float4(out_a.real_, out_a.imag_, out_b.real_, out_b.imag_);
     }
 };
-#endif
 
 // A stateful callback functor that maintains a running prefix to be applied
 // during consecutive scan operations.
@@ -148,7 +145,6 @@ template <typename scalar_t> struct SSMScanPrefixCallbackOp {
     }
 };
 
-#if 0
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<typename Ktraits>
@@ -225,4 +221,3 @@ inline __device__ void store_output(typename Ktraits::input_t *out,
         Ktraits::BlockStoreT(smem_store).Store(out, write_vals, seqlen);
     }
 }
-#endif

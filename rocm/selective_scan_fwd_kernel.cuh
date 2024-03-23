@@ -1,20 +1,29 @@
 #pragma once
 
-//#include <c10/util/BFloat16.h>
-//#include <c10/util/Half.h>
+#include <c10/util/BFloat16.h>
+#include <c10/util/Half.h>
 //#include <c10/cuda/CUDAException.h>  // For C10_CUDA_CHECK and C10_CUDA_KERNEL_LAUNCH_CHECK
 
-#define C10_CUDA_CHECK(a) {a;} 
+#define CHECK_HIP(expr) do {              \
+  hipError_t result = (expr);             \
+  if (result != hipSuccess) {             \
+    fprintf(stderr, "%s:%d: %s (%d)\n",   \
+      __FILE__, __LINE__,                 \
+      hipGetErrorString(result), result); \
+    exit(EXIT_FAILURE);                   \
+  }                                       \
+} while(0)
+
 #define C10_CUDA_KERNEL_LAUNCH_CHECK()
+
+#include "selective_scan.h"
+#include "selective_scan_common.h"
+#include "static_switch.h"
 
 #include <hipcub/block/block_load.hpp>
 #include <hipcub/block/block_store.hpp>
 #include <hipcub/block/block_scan.hpp>
 namespace cub = hipcub;
-
-#include "selective_scan.h"
-#include "selective_scan_common.h"
-#include "static_switch.h"
 
 template<int kNThreads_, int kNItems_, int kNRows_, bool kIsEvenLen_,
          bool kIsVariableB_, bool kIsVariableC_,
@@ -33,7 +42,7 @@ struct Selective_Scan_fwd_kernel_traits {
     static constexpr int kNElts = kNBytes == 4 ? 4 : std::min(8, kNItems);
     static_assert(kNItems % kNElts == 0);
     static constexpr int kNLoads = kNItems / kNElts;
-    static constexpr bool kIsComplex = false; // std::is_same_v<weight_t, complex_t>;
+    static constexpr bool kIsComplex = std::is_same_v<weight_t, complex_t>;
     static constexpr bool kIsEvenLen = kIsEvenLen_;
     static constexpr bool kIsVariableB = kIsVariableB_;
     static constexpr bool kIsVariableC = kIsVariableC_;
@@ -221,7 +230,6 @@ void selective_scan_fwd_kernel(SSMParamsBase params) {
                             }
                         }
                     } else {
-#if 0
                         // Pytorch's implementation of complex exp (which calls thrust) is very slow
                         complex_t delta_a_exp = cexp2f(delta_vals[r][i] * A_val[r]);
                         weight_t B_delta_u_val = !kIsVariableB ? delta_u_vals[r][i] : B_vals[i] * delta_u_vals[r][i];
@@ -231,7 +239,6 @@ void selective_scan_fwd_kernel(SSMParamsBase params) {
                                 thread_data[i] = make_float4(1.f, 0.f, 0.f, 0.f);
                             }
                         }
-#endif
                     }
                 }
                 // Initialize running total
@@ -316,22 +323,23 @@ void selective_scan_fwd_launch(SSMParamsBase &params, hipStream_t stream) {
                     using Ktraits = Selective_Scan_fwd_kernel_traits<kNThreads, kNItems, kNRows, kIsEvenLen, kIsVariableB, kIsVariableC, kHasZ, input_t, weight_t>;
                     // constexpr int kSmemSize = Ktraits::kSmemSize;
                     constexpr int kSmemSize = Ktraits::kSmemSize + kNRows * MAX_DSTATE * sizeof(typename Ktraits::scan_t);
+#if 0
                     // printf("smem_size = %d\n", kSmemSize);
                     dim3 grid(params.batch, params.dim / kNRows);
                     auto kernel = &selective_scan_fwd_kernel<Ktraits>;
                     if (kSmemSize >= 48 * 1024) {
-                        C10_CUDA_CHECK(hipFuncSetAttribute(
-                            kernel, hipFuncAttributeMaxDynamicSharedMemorySize, kSmemSize));
+                        CHECK_HIP(hipFuncSetAttribute(
+                            (const void*)kernel, hipFuncAttributeMaxDynamicSharedMemorySize, kSmemSize));
                     }
                     kernel<<<grid, Ktraits::kNThreads, kSmemSize, stream>>>(params);
                     C10_CUDA_KERNEL_LAUNCH_CHECK();
+#endif
                 });
             });
         });
     });
 }
 
-#if 0
 template<typename input_t, typename weight_t>
 void selective_scan_fwd_cuda(SSMParamsBase &params, hipStream_t stream) {
     if (params.seqlen <= 128) {
@@ -346,4 +354,3 @@ void selective_scan_fwd_cuda(SSMParamsBase &params, hipStream_t stream) {
         selective_scan_fwd_launch<128, 16, input_t, weight_t>(params, stream);
     }
 }
-#endif
