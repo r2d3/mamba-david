@@ -28,4 +28,7 @@ add_executable(test mamba.cpp)
 target_link_libraries(test PRIVATE hip::device)
 set_source_files_properties(mamba.cpp PROPERTIES LANGUAGE HIP)
 
+add_executable(bug1 bug1.hip)
+target_link_libraries(bug1 PRIVATE hip::host)
+
 pybind11_add_module(mamba mamba_python.cpp)
