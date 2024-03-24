@@ -252,7 +252,7 @@ void selective_scan_fwd_kernel(SSMParamsBase params) {
                     // running_prefix = chunk > 0 && threadIdx.x == 0 ? smem_running_prefix[state_idx] : make_float4(1.f, 0.f, 0.f, 0.f);
                 }
                 SSMScanPrefixCallbackOp<weight_t> prefix_op(running_prefix);
-                Ktraits::BlockScanT(smem_scan).InclusiveScan(
+                (typename Ktraits::BlockScanT)(smem_scan).InclusiveScan(
                     thread_data, thread_data, SSMScanOp<weight_t>(), prefix_op
                 );
                 // There's a syncthreads in the scan op, so we don't need to sync here.
@@ -311,6 +311,34 @@ void selective_scan_fwd_kernel(SSMParamsBase params) {
     }
 }
 
+template<typename Ktraits>
+__global__ __launch_bounds__(Ktraits::kNThreads, Ktraits::kMinBlocks)
+void testKernel(SSMParamsBase params)
+{
+    constexpr bool kIsComplex = Ktraits::kIsComplex;
+    constexpr bool kIsVariableB = Ktraits::kIsVariableB;
+    constexpr bool kIsVariableC = Ktraits::kIsVariableC;
+    constexpr bool kHasZ = Ktraits::kHasZ;
+    constexpr int kNThreads = Ktraits::kNThreads;
+    constexpr int kNItems = Ktraits::kNItems;
+    constexpr int kNRows = Ktraits::kNRows;
+    constexpr bool kDirectIO = Ktraits::kDirectIO;
+    using input_t = typename Ktraits::input_t;
+    using weight_t = typename Ktraits::weight_t;
+    using scan_t = typename Ktraits::scan_t;
+
+    input_t* u = reinterpret_cast<input_t*>(params.u_ptr);
+    input_t items[4];
+    //typename Ktraits::BlockLoadT load;
+    //hipcub::BlockLoad<float, 32, 4, hipcub::BLOCK_LOAD_WARP_TRANSPOSE> load;
+    //hipcub::BlockStore<float, 32, 4, hipcub::BLOCK_STORE_WARP_TRANSPOSE> store;
+    typedef hipcub::BlockLoad<float, 32, 4, hipcub::BLOCK_LOAD_WARP_TRANSPOSE> BlockLoad;
+    hipcub::BlockLoad<float, 32, 4> load;
+    hipcub::BlockStore<float, 32, 4> store;
+    load.Load(u, items);
+    store.Store(u, items);
+}
+
 template<int kNThreads, int kNItems, typename input_t, typename weight_t>
 void selective_scan_fwd_launch(SSMParamsBase &params, hipStream_t stream) {
     // Only kNRows == 1 is tested for now, which ofc doesn't differ from previously when we had each block
@@ -321,9 +349,21 @@ void selective_scan_fwd_launch(SSMParamsBase &params, hipStream_t stream) {
             BOOL_SWITCH(params.is_variable_C, kIsVariableC, [&] {
                 BOOL_SWITCH(params.z_ptr != nullptr , kHasZ, [&] {
                     using Ktraits = Selective_Scan_fwd_kernel_traits<kNThreads, kNItems, kNRows, kIsEvenLen, kIsVariableB, kIsVariableC, kHasZ, input_t, weight_t>;
+                    constexpr int kSmemSize = kNRows * MAX_DSTATE * sizeof(typename Ktraits::scan_t);
+                    dim3 grid(params.batch, params.dim / kNRows);
+#if 0
+                    hipLaunchKernelGGL(
+                        //HIP_KERNEL_NAME(selective_scan_fwd_kernel<Ktraits>),
+                        HIP_KERNEL_NAME(testKernel<Ktraits>),
+                        grid, Ktraits::kNThreads, kSmemSize, stream,
+                        params
+                    );
+#endif
+                    auto kernel = &testKernel<Ktraits>;
+                    kernel<<<grid, Ktraits::kNThreads, kSmemSize, stream>>>(params);
+#if 0
                     // constexpr int kSmemSize = Ktraits::kSmemSize;
                     constexpr int kSmemSize = Ktraits::kSmemSize + kNRows * MAX_DSTATE * sizeof(typename Ktraits::scan_t);
-#if 0
                     // printf("smem_size = %d\n", kSmemSize);
                     dim3 grid(params.batch, params.dim / kNRows);
                     auto kernel = &selective_scan_fwd_kernel<Ktraits>;

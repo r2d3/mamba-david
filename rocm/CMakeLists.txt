@@ -36,5 +36,5 @@ pybind11_add_module(mamba_ssm mamba_python.cpp)
 target_link_libraries(mamba_ssm PRIVATE c10 torch)
 set_source_files_properties(mamba_python.cpp PROPERTIES LANGUAGE HIP)
 
-add_executable(bug1 bug1.hip)
+add_executable(bug1 EXCLUDE_FROM_ALL bug1.hip)
 target_link_libraries(bug1 PRIVATE hip::host)
