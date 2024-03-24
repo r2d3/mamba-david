@@ -332,11 +332,19 @@ void testKernel(SSMParamsBase params)
     //typename Ktraits::BlockLoadT load;
     //hipcub::BlockLoad<float, 32, 4, hipcub::BLOCK_LOAD_WARP_TRANSPOSE> load;
     //hipcub::BlockStore<float, 32, 4, hipcub::BLOCK_STORE_WARP_TRANSPOSE> store;
-    typedef hipcub::BlockLoad<float, 32, 4, hipcub::BLOCK_LOAD_WARP_TRANSPOSE> BlockLoad;
     hipcub::BlockLoad<float, 32, 4> load;
     hipcub::BlockStore<float, 32, 4> store;
     load.Load(u, items);
     store.Store(u, items);
+
+    // Workaround compiler bug
+#if __HIP_DEVICE_COMPILE__
+    typedef cub::BlockLoad<float, 32, 4, cub::BLOCK_LOAD_WARP_TRANSPOSE> BlockLoad;
+    typedef cub::BlockLoad<float, 32, 4, cub::BLOCK_LOAD_WARP_TRANSPOSE>::TempStorage tempS;
+    size_t s = sizeof(tempS);
+    BlockLoad load2;
+    load2.Load(u, items);
+#endif
 }
 
 template<int kNThreads, int kNItems, typename input_t, typename weight_t>
