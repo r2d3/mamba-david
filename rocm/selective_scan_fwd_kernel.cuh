@@ -87,18 +87,23 @@ void selective_scan_fwd_kernel(SSMParamsBase params) {
     using input_t = typename Ktraits::input_t;
     using weight_t = typename Ktraits::weight_t;
     using scan_t = typename Ktraits::scan_t;
+    using BlockLoadT = typename Ktraits::BlockLoadT;
+    using BlockStoreT = typename Ktraits::BlockStoreT;
+    using BlockScanT = typename Ktraits::BlockScanT;
+    using BlockLoadWeightT = typename Ktraits::BlockLoadWeightT;
 
+#if __HIP_DEVICE_COMPILE__
     // Shared memory.
     extern __shared__ char smem_[];
     // cast to lvalue reference of expected type
     // char *smem_loadstorescan = smem_ + 2 * MAX_DSTATE * sizeof(weight_t);
     // auto& smem_load = reinterpret_cast<typename BlockLoadT::TempStorage&>(smem_ + 2 * MAX_DSTATE * sizeof(weight_t));
     // auto& smem_load = reinterpret_cast<typename BlockLoadT::TempStorage&>(smem_loadstorescan);
-    auto& smem_load = reinterpret_cast<typename Ktraits::BlockLoadT::TempStorage&>(smem_);
-    auto& smem_load_weight = reinterpret_cast<typename Ktraits::BlockLoadWeightT::TempStorage&>(smem_);
-    auto& smem_load_weight1 = *reinterpret_cast<typename Ktraits::BlockLoadWeightT::TempStorage*>(smem_ + sizeof(typename Ktraits::BlockLoadWeightT::TempStorage));
-    auto& smem_store = reinterpret_cast<typename Ktraits::BlockStoreT::TempStorage&>(smem_);
-    auto& smem_scan = *reinterpret_cast<typename Ktraits::BlockScanT::TempStorage*>(smem_ + Ktraits::kSmemIOSize);
+    auto& smem_load = reinterpret_cast<typename BlockLoadT::TempStorage&>(smem_);
+    auto& smem_load_weight = reinterpret_cast<typename BlockLoadWeightT::TempStorage&>(smem_);
+    auto& smem_load_weight1 = *reinterpret_cast<typename BlockLoadWeightT::TempStorage*>(smem_ + sizeof(typename BlockLoadWeightT::TempStorage));
+    auto& smem_store = reinterpret_cast<typename BlockStoreT::TempStorage&>(smem_);
+    auto& smem_scan = *reinterpret_cast<typename BlockScanT::TempStorage*>(smem_ + Ktraits::kSmemIOSize);
     // weight_t *smem_a = reinterpret_cast<weight_t *>(smem_ + smem_loadstorescan_size);
     // weight_t *smem_bc = reinterpret_cast<weight_t *>(smem_a + MAX_DSTATE);
     scan_t *smem_running_prefix = reinterpret_cast<scan_t *>(smem_ + Ktraits::kSmemSize);
@@ -252,7 +257,7 @@ void selective_scan_fwd_kernel(SSMParamsBase params) {
                     // running_prefix = chunk > 0 && threadIdx.x == 0 ? smem_running_prefix[state_idx] : make_float4(1.f, 0.f, 0.f, 0.f);
                 }
                 SSMScanPrefixCallbackOp<weight_t> prefix_op(running_prefix);
-                (typename Ktraits::BlockScanT)(smem_scan).InclusiveScan(
+                BlockScanT(smem_scan).InclusiveScan(
                     thread_data, thread_data, SSMScanOp<weight_t>(), prefix_op
                 );
                 // There's a syncthreads in the scan op, so we don't need to sync here.
@@ -309,41 +314,6 @@ void selective_scan_fwd_kernel(SSMParamsBase params) {
         Bvar += kChunkSize * (!kIsComplex ? 1 : 2);
         Cvar += kChunkSize * (!kIsComplex ? 1 : 2);
     }
-}
-
-template<typename Ktraits>
-__global__ __launch_bounds__(Ktraits::kNThreads, Ktraits::kMinBlocks)
-void testKernel(SSMParamsBase params)
-{
-    constexpr bool kIsComplex = Ktraits::kIsComplex;
-    constexpr bool kIsVariableB = Ktraits::kIsVariableB;
-    constexpr bool kIsVariableC = Ktraits::kIsVariableC;
-    constexpr bool kHasZ = Ktraits::kHasZ;
-    constexpr int kNThreads = Ktraits::kNThreads;
-    constexpr int kNItems = Ktraits::kNItems;
-    constexpr int kNRows = Ktraits::kNRows;
-    constexpr bool kDirectIO = Ktraits::kDirectIO;
-    using input_t = typename Ktraits::input_t;
-    using weight_t = typename Ktraits::weight_t;
-    using scan_t = typename Ktraits::scan_t;
-
-    input_t* u = reinterpret_cast<input_t*>(params.u_ptr);
-    input_t items[4];
-    //typename Ktraits::BlockLoadT load;
-    //hipcub::BlockLoad<float, 32, 4, hipcub::BLOCK_LOAD_WARP_TRANSPOSE> load;
-    //hipcub::BlockStore<float, 32, 4, hipcub::BLOCK_STORE_WARP_TRANSPOSE> store;
-    hipcub::BlockLoad<float, 32, 4> load;
-    hipcub::BlockStore<float, 32, 4> store;
-    load.Load(u, items);
-    store.Store(u, items);
-
-    // Workaround compiler bug
-#if __HIP_DEVICE_COMPILE__
-    typedef cub::BlockLoad<float, 32, 4, cub::BLOCK_LOAD_WARP_TRANSPOSE> BlockLoad;
-    typedef cub::BlockLoad<float, 32, 4, cub::BLOCK_LOAD_WARP_TRANSPOSE>::TempStorage tempS;
-    size_t s = sizeof(tempS);
-    BlockLoad load2;
-    load2.Load(u, items);
 #endif
 }
 
@@ -357,22 +327,14 @@ void selective_scan_fwd_launch(SSMParamsBase &params, hipStream_t stream) {
             BOOL_SWITCH(params.is_variable_C, kIsVariableC, [&] {
                 BOOL_SWITCH(params.z_ptr != nullptr , kHasZ, [&] {
                     using Ktraits = Selective_Scan_fwd_kernel_traits<kNThreads, kNItems, kNRows, kIsEvenLen, kIsVariableB, kIsVariableC, kHasZ, input_t, weight_t>;
-                    constexpr int kSmemSize = kNRows * MAX_DSTATE * sizeof(typename Ktraits::scan_t);
-                    dim3 grid(params.batch, params.dim / kNRows);
-#if 0
-                    hipLaunchKernelGGL(
-                        //HIP_KERNEL_NAME(selective_scan_fwd_kernel<Ktraits>),
-                        HIP_KERNEL_NAME(testKernel<Ktraits>),
-                        grid, Ktraits::kNThreads, kSmemSize, stream,
-                        params
-                    );
-#endif
-                    auto kernel = &testKernel<Ktraits>;
-                    kernel<<<grid, Ktraits::kNThreads, kSmemSize, stream>>>(params);
 #if 0
                     // constexpr int kSmemSize = Ktraits::kSmemSize;
                     constexpr int kSmemSize = Ktraits::kSmemSize + kNRows * MAX_DSTATE * sizeof(typename Ktraits::scan_t);
                     // printf("smem_size = %d\n", kSmemSize);
+#else
+                    // TODO: compute 
+                    constexpr int kSmemSize = kNRows * MAX_DSTATE * sizeof(typename Ktraits::scan_t);
+#endif
                     dim3 grid(params.batch, params.dim / kNRows);
                     auto kernel = &selective_scan_fwd_kernel<Ktraits>;
                     if (kSmemSize >= 48 * 1024) {
@@ -381,7 +343,6 @@ void selective_scan_fwd_launch(SSMParamsBase &params, hipStream_t stream) {
                     }
                     kernel<<<grid, Ktraits::kNThreads, kSmemSize, stream>>>(params);
                     C10_CUDA_KERNEL_LAUNCH_CHECK();
-#endif
                 });
             });
         });

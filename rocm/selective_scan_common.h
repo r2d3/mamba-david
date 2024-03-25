@@ -152,15 +152,17 @@ inline __device__ void load_input(typename Ktraits::input_t *u,
                                   typename Ktraits::input_t (&u_vals)[Ktraits::kNItems],
                                   typename Ktraits::BlockLoadT::TempStorage &smem_load,
                                   int seqlen) {
+    using BlockLoadVecT = typename Ktraits::BlockLoadVecT;
+    using BlockLoadT = typename Ktraits::BlockLoadT;
     if constexpr (Ktraits::kIsEvenLen) {
-        auto& smem_load_vec = reinterpret_cast<typename Ktraits::BlockLoadVecT::TempStorage&>(smem_load);
+        auto& smem_load_vec = reinterpret_cast<typename BlockLoadVecT::TempStorage&>(smem_load);
         using vec_t = typename Ktraits::vec_t;
-        Ktraits::BlockLoadVecT(smem_load_vec).Load(
+        BlockLoadVecT(smem_load_vec).Load(
             reinterpret_cast<vec_t*>(u),
             reinterpret_cast<vec_t(&)[Ktraits::kNLoads]>(u_vals)
        );
     } else {
-        Ktraits::BlockLoadT(smem_load).Load(u, u_vals, seqlen, 0.f);
+        BlockLoadT(smem_load).Load(u, u_vals, seqlen, 0.f);
     }
 }
 
@@ -169,18 +171,21 @@ inline __device__ void load_weight(typename Ktraits::input_t *Bvar,
                                    typename Ktraits::weight_t (&B_vals)[Ktraits::kNItems],
                                    typename Ktraits::BlockLoadWeightT::TempStorage &smem_load_weight,
                                    int seqlen) {
+    using BlockLoadWeightVecT = typename Ktraits::BlockLoadWeightVecT;
+    using BlockLoadWeightT = typename Ktraits::BlockLoadWeightT;
+
     constexpr int kNItems = Ktraits::kNItems;
     if constexpr (!Ktraits::kIsComplex) {
         typename Ktraits::input_t B_vals_load[kNItems];
         if constexpr (Ktraits::kIsEvenLen) {
-            auto& smem_load_weight_vec = reinterpret_cast<typename Ktraits::BlockLoadWeightVecT::TempStorage&>(smem_load_weight);
+            auto& smem_load_weight_vec = reinterpret_cast<typename BlockLoadWeightVecT::TempStorage&>(smem_load_weight);
             using vec_t = typename Ktraits::vec_t;
-            Ktraits::BlockLoadWeightVecT(smem_load_weight_vec).Load(
+            BlockLoadWeightVecT(smem_load_weight_vec).Load(
                 reinterpret_cast<vec_t*>(Bvar),
                 reinterpret_cast<vec_t(&)[Ktraits::kNLoads]>(B_vals_load)
           );
         } else {
-            Ktraits::BlockLoadWeightT(smem_load_weight).Load(Bvar, B_vals_load, seqlen, 0.f);
+            BlockLoadWeightT(smem_load_weight).Load(Bvar, B_vals_load, seqlen, 0.f);
         }
         // #pragma unroll
         // for (int i = 0; i < kNItems; ++i) { B_vals[i] = B_vals_load[i]; }
@@ -188,14 +193,14 @@ inline __device__ void load_weight(typename Ktraits::input_t *Bvar,
     } else {
         typename Ktraits::input_t B_vals_load[kNItems * 2];
         if constexpr (Ktraits::kIsEvenLen) {
-            auto& smem_load_weight_vec = reinterpret_cast<typename Ktraits::BlockLoadWeightVecT::TempStorage&>(smem_load_weight);
+            auto& smem_load_weight_vec = reinterpret_cast<typename BlockLoadWeightVecT::TempStorage&>(smem_load_weight);
             using vec_t = typename Ktraits::vec_t;
-            Ktraits::BlockLoadWeightVecT(smem_load_weight_vec).Load(
+            BlockLoadWeightVecT(smem_load_weight_vec).Load(
                 reinterpret_cast<vec_t*>(Bvar),
                 reinterpret_cast<vec_t(&)[Ktraits::kNLoads * 2]>(B_vals_load)
           );
         } else {
-            Ktraits::BlockLoadWeightT(smem_load_weight).Load(Bvar, B_vals_load, seqlen, 0.f);
+            BlockLoadWeightT(smem_load_weight).Load(Bvar, B_vals_load, seqlen, 0.f);
         }
         #pragma unroll
         for (int i = 0; i < kNItems; ++i) { B_vals[i] = complex_t(B_vals_load[i * 2], B_vals_load[i * 2 + 1]); }
@@ -207,17 +212,20 @@ inline __device__ void store_output(typename Ktraits::input_t *out,
                                     const float (&out_vals)[Ktraits::kNItems],
                                     typename Ktraits::BlockStoreT::TempStorage &smem_store,
                                     int seqlen) {
+    using BlockStoreVecT = typename Ktraits::BlockStoreVecT;
+    using BlockStoreT = typename Ktraits::BlockStoreT;
+
     typename Ktraits::input_t write_vals[Ktraits::kNItems];
     #pragma unroll
     for (int i = 0; i < Ktraits::kNItems; ++i) { write_vals[i] = out_vals[i]; }
     if constexpr (Ktraits::kIsEvenLen) {
-        auto& smem_store_vec = reinterpret_cast<typename Ktraits::BlockStoreVecT::TempStorage&>(smem_store);
+        auto& smem_store_vec = reinterpret_cast<typename BlockStoreVecT::TempStorage&>(smem_store);
         using vec_t = typename Ktraits::vec_t;
-        Ktraits::BlockStoreVecT(smem_store_vec).Store(
+        BlockStoreVecT(smem_store_vec).Store(
             reinterpret_cast<vec_t*>(out),
             reinterpret_cast<vec_t(&)[Ktraits::kNLoads]>(write_vals)
        );
     } else {
-        Ktraits::BlockStoreT(smem_store).Store(out, write_vals, seqlen);
+        BlockStoreT(smem_store).Store(out, write_vals, seqlen);
     }
 }
