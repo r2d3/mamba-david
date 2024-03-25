@@ -20,7 +20,7 @@ It download pybind11, find the location of the `torch` Python as it contains inc
 We use `rocm/pytorch` Docker image to do compilation/execution
 
 ~~~ bash
-git clone -b feature/rocm git@github.com:r2d3/mamba.git mamba-david
+git clone -b feature/rocm git@github.com:r2d3/mamba-david.git mamba-david
 
 docker run -it --mount type=bind,source=/home/a2labs,target=/host \
  --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
