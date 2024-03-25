@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
 project(mamba LANGUAGES CXX HIP)
 
-# AMD XTX 7900: gfx1100 
-# AMD MI210: gfx908 ?? 
+# AMD XTX 7900: gfx1100
+# AMD MI210: gfx908 ??
 # AWS g4ad: gfx1011
 # We could limit to one architecture for faster compile
-set(CMAKE_HIP_ARCHITECTURES gfx908;gfx1011;gfx1100)
+set(CMAKE_HIP_ARCHITECTURES gfx1011;gfx1030;gfx1100)
 set(CMAKE_CXX_STANDARD 17)
 
 # Dependencies
@@ -41,13 +41,13 @@ include_directories(${PT}/include ${PT}/include/torch/csrc/api/include)
 link_directories(${PT}/lib)
 
 pybind11_add_module(mamba mamba_python.cpp)
-target_link_libraries(mamba PRIVATE c10 torch)
+target_link_libraries(mamba PRIVATE c10 c10_hip)
 set_source_files_properties(mamba_python.cpp PROPERTIES LANGUAGE HIP)
 
-pybind11_add_module(mamba_ssm selective_scan.cpp mamba.hip)
-target_link_libraries(mamba_ssm PRIVATE c10 torch torch_python)
+pybind11_add_module(selective_scan_cuda selective_scan.cpp mamba.hip)
+target_link_libraries(selective_scan_cuda PRIVATE c10 c10_hip torch torch_python)
 set_source_files_properties(selective_scan.cpp PROPERTIES LANGUAGE HIP)
-target_compile_definitions(mamba_ssm PRIVATE TORCH_EXTENSION_NAME=mamba_ssm)
+target_compile_definitions(selective_scan_cuda PRIVATE TORCH_EXTENSION_NAME=selective_scan_cuda)
 
 add_executable(bug1 EXCLUDE_FROM_ALL bug1.hip)
 target_link_libraries(bug1 PRIVATE hip::host)

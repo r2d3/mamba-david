@@ -141,7 +141,6 @@ void set_ssm_params_fwd(SSMParamsBase &params,
     params.out_d_stride = out.stride(1);
 }
 
-#if 0
 void set_ssm_params_bwd(SSMParamsBwd &params,
                         // sizes
                         const size_t batch,
@@ -224,7 +223,6 @@ void set_ssm_params_bwd(SSMParamsBwd &params,
         params.dz_d_stride = dz.stride(1);
     }
 }
-#endif
 
 std::vector<at::Tensor>
 selective_scan_fwd(const at::Tensor &u, const at::Tensor &delta,
@@ -338,7 +336,6 @@ selective_scan_fwd(const at::Tensor &u, const at::Tensor &delta,
     return result;
 }
 
-#if 0
 std::vector<at::Tensor>
 selective_scan_bwd(const at::Tensor &u, const at::Tensor &delta,
                   const at::Tensor &A, const at::Tensor &B, const at::Tensor &C,
@@ -480,6 +477,7 @@ selective_scan_bwd(const at::Tensor &u, const at::Tensor &delta,
                        delta_bias_.has_value() ? ddelta_bias.data_ptr() : nullptr,
                        has_z, delta_softplus, recompute_out_z);
 
+#if 0
     // Otherwise the kernel will be launched from cuda:0 device
     // Cast to char to avoid compiler warning about narrowing
     at::cuda::HIPGuard device_guard{(char)u.get_device()};
@@ -489,14 +487,14 @@ selective_scan_bwd(const at::Tensor &u, const at::Tensor &delta,
             selective_scan_bwd_cuda<input_t, weight_t>(params, stream);
         });
     });
+#endif
     std::vector<at::Tensor> result = {du, ddelta, dA, dB.to(B.dtype()), dC.to(C.dtype()), dD, ddelta_bias};
     if (has_z) { result.push_back(dz); }
     if (recompute_out_z) { result.push_back(out_z); }
     return result;
 }
-#endif
 
 PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.def("fwd", &selective_scan_fwd, "Selective scan forward");
-    //m.def("bwd", &selective_scan_bwd, "Selective scan backward");
+    m.def("bwd", &selective_scan_bwd, "Selective scan backward");
 }

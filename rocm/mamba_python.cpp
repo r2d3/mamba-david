@@ -5,23 +5,39 @@ namespace py = pybind11;
 using namespace std;
 
 #include <hip/hip_runtime.h>
-#include <ATen/core/Tensor.h>
+#include <c10/hip/HIPException.h>  // For C10_HIP_CHECK and C10_HIP_KERNEL_LAUNCH_CHECK
 
-#include "selective_scan.h"
-
-template<typename input_t, typename weight_t>
-void selective_scan_fwd_cuda(SSMParamsBase& params, hipStream_t stream);
+__global__ void sq_arr(float *arr, int n)
+{
+    int tid = blockDim.x*blockIdx.x + threadIdx.x;
+    if (tid < n) {
+        arr[tid] = arr[tid] * arr[tid];
+    }
+}
 
 void test()
 {
-    cout << "Test" << endl;
-    at::Tensor a;
-    at::Tensor b;
-    cout << a.stride(0) << endl;
+  const int N = 10000000;
+  std::vector<float> hArr(N);
+  for (int i = 0; i < 10; i++)
+    hArr[i] = i+1;
+  float *dArr;
+  C10_HIP_CHECK(hipMalloc(&dArr, sizeof(float) * N));
+  for (int j = 0; j < 1000; j++)
+  {
+    C10_HIP_CHECK(hipMemcpy(dArr, hArr.data(), sizeof(float) * N, hipMemcpyHostToDevice));
+    sq_arr<<<dim3(1), dim3(32,1,1), 0, 0>>>(dArr, N);
+    C10_HIP_CHECK(hipDeviceSynchronize());
+    C10_HIP_KERNEL_LAUNCH_CHECK();
+  }
+  C10_HIP_CHECK(hipMemcpy(hArr.data(), dArr, sizeof(float) * N, hipMemcpyDeviceToHost));
+  for (int i = 0; i < 10; ++i)
+    printf("%f\n", hArr[i]);
+  C10_HIP_CHECK(hipFree(dArr));
 }
 
-PYBIND11_MODULE(mamba_ssm, m) {
+
+PYBIND11_MODULE(mamba, m) {
     m.doc() = "ROCm Mamba module";
-//    m.def("fwd", &selective_scan_fwd, "Selective scan forward");
     m.def("test", &test, "Test");
 }

@@ -321,7 +321,7 @@ void selective_scan_fwd_launch(SSMParamsBase &params, hipStream_t stream) {
                     // printf("smem_size = %d\n", kSmemSize);
 #else
                     // TODO: compute 
-                    constexpr int kSmemSize = kNRows * MAX_DSTATE * sizeof(typename Ktraits::scan_t);
+                    constexpr int kSmemSize = 48*1000; //kNRows * MAX_DSTATE * sizeof(typename Ktraits::scan_t);
 #endif
                     dim3 grid(params.batch, params.dim / kNRows);
                     auto kernel = &selective_scan_fwd_kernel<Ktraits>;
