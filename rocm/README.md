@@ -32,7 +32,8 @@ mkdir ~/build_mamba && cd ~/build_mamba
 cmake -DCMAKE_PREFIX_PATH=/opt/rocm /host/mamba-david/rocm
 
 make -j 10
-python -c "import mamba; mamba.test()"
+HIP_VISIBLE_DEVICES=0 ROCR_VISIBLE_DEVICES=0 \
+  python -c "import mamba; mamba.test()"
 
 # Install packages needed to run the test
 pip install einops
