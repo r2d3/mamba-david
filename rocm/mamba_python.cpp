@@ -5,7 +5,7 @@ namespace py = pybind11;
 using namespace std;
 
 #include <hip/hip_runtime.h>
-#include <torch/extension.h>
+#include <ATen/core/Tensor.h>
 
 #include "selective_scan.h"
 

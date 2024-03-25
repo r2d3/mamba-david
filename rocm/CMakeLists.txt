@@ -1,7 +1,11 @@
 cmake_minimum_required(VERSION 3.16)
 project(mamba LANGUAGES CXX HIP)
 
-set(CMAKE_HIP_ARCHITECTURES gfx1011)
+# AMD XTX 7900: gfx1100 
+# AMD MI210: gfx908 ?? 
+# AWS g4ad: gfx1011
+# We could limit to one architecture for faster compile
+set(CMAKE_HIP_ARCHITECTURES gfx908;gfx1011;gfx1100)
 set(CMAKE_CXX_STANDARD 17)
 
 # Dependencies
@@ -23,8 +27,16 @@ fetch_dependency(pybind11 https://github.com/pybind/pybind11.git stable)
 add_subdirectory(${pybind11_SOURCE_DIR} ${pybind11_BINARY_DIR})
 
 find_package(hip REQUIRED)
+find_package(PythonInterp REQUIRED)
 
-set(PT "/opt/conda/envs/py_3.9/lib/python3.9/site-packages/torch")
+# Find Python site-packages
+execute_process(
+  COMMAND "${PYTHON_EXECUTABLE}" -c "import site; print(site.getsitepackages()[0])"
+  OUTPUT_VARIABLE PYTHON_SITE
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+
+set(PT "${PYTHON_SITE}/torch")
+message(STATUS "Using torch library from: ${PT}")
 include_directories(${PT}/include ${PT}/include/torch/csrc/api/include)
 link_directories(${PT}/lib)
 
