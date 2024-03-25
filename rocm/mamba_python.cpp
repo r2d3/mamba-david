@@ -27,7 +27,6 @@ void test()
   {
     C10_HIP_CHECK(hipMemcpy(dArr, hArr.data(), sizeof(float) * N, hipMemcpyHostToDevice));
     sq_arr<<<dim3(1), dim3(32,1,1), 0, 0>>>(dArr, N);
-    C10_HIP_CHECK(hipDeviceSynchronize());
     C10_HIP_KERNEL_LAUNCH_CHECK();
   }
   C10_HIP_CHECK(hipMemcpy(hArr.data(), dArr, sizeof(float) * N, hipMemcpyDeviceToHost));
