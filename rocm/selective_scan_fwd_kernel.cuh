@@ -2,19 +2,7 @@
 
 #include <c10/util/BFloat16.h>
 #include <c10/util/Half.h>
-//#include <c10/cuda/CUDAException.h>  // For C10_CUDA_CHECK and C10_CUDA_KERNEL_LAUNCH_CHECK
-
-#define CHECK_HIP(expr) do {              \
-  hipError_t result = (expr);             \
-  if (result != hipSuccess) {             \
-    fprintf(stderr, "%s:%d: %s (%d)\n",   \
-      __FILE__, __LINE__,                 \
-      hipGetErrorString(result), result); \
-    exit(EXIT_FAILURE);                   \
-  }                                       \
-} while(0)
-
-#define C10_CUDA_KERNEL_LAUNCH_CHECK()
+#include <c10/hip/HIPException.h>  // For C10_HIP_CHECK and C10_HIP_KERNEL_LAUNCH_CHECK
 
 #include "selective_scan.h"
 #include "selective_scan_common.h"
@@ -338,11 +326,11 @@ void selective_scan_fwd_launch(SSMParamsBase &params, hipStream_t stream) {
                     dim3 grid(params.batch, params.dim / kNRows);
                     auto kernel = &selective_scan_fwd_kernel<Ktraits>;
                     if (kSmemSize >= 48 * 1024) {
-                        CHECK_HIP(hipFuncSetAttribute(
+                        C10_HIP_CHECK(hipFuncSetAttribute(
                             (const void*)kernel, hipFuncAttributeMaxDynamicSharedMemorySize, kSmemSize));
                     }
                     kernel<<<grid, Ktraits::kNThreads, kSmemSize, stream>>>(params);
-                    C10_CUDA_KERNEL_LAUNCH_CHECK();
+                    C10_HIP_KERNEL_LAUNCH_CHECK();
                 });
             });
         });

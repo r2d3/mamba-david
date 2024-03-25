@@ -28,13 +28,14 @@ set(PT "/opt/conda/envs/py_3.9/lib/python3.9/site-packages/torch")
 include_directories(${PT}/include ${PT}/include/torch/csrc/api/include)
 link_directories(${PT}/lib)
 
-add_executable(test mamba.cpp)
-target_link_libraries(test PRIVATE c10 torch hip::device)
-set_source_files_properties(mamba.cpp PROPERTIES LANGUAGE HIP)
-
-pybind11_add_module(mamba_ssm mamba_python.cpp)
-target_link_libraries(mamba_ssm PRIVATE c10 torch)
+pybind11_add_module(mamba mamba_python.cpp)
+target_link_libraries(mamba PRIVATE c10 torch)
 set_source_files_properties(mamba_python.cpp PROPERTIES LANGUAGE HIP)
+
+pybind11_add_module(mamba_ssm selective_scan.cpp mamba.hip)
+target_link_libraries(mamba_ssm PRIVATE c10 torch torch_python)
+set_source_files_properties(selective_scan.cpp PROPERTIES LANGUAGE HIP)
+target_compile_definitions(mamba_ssm PRIVATE TORCH_EXTENSION_NAME=mamba_ssm)
 
 add_executable(bug1 EXCLUDE_FROM_ALL bug1.hip)
 target_link_libraries(bug1 PRIVATE hip::host)
