@@ -44,10 +44,11 @@ pybind11_add_module(mamba mamba_python.cpp)
 target_link_libraries(mamba PRIVATE c10 c10_hip)
 set_source_files_properties(mamba_python.cpp PROPERTIES LANGUAGE HIP)
 
-pybind11_add_module(selective_scan_cuda selective_scan.cpp mamba.hip)
+pybind11_add_module(selective_scan_cuda selective_scan.cpp
+  mamba_fwd.hip mamba_bwd.hip selective_scan_fwd_kernel.cuh selective_scan_bwd_kernel.cuh)
 target_link_libraries(selective_scan_cuda PRIVATE c10 c10_hip torch torch_python)
 set_source_files_properties(selective_scan.cpp PROPERTIES LANGUAGE HIP)
-target_compile_definitions(selective_scan_cuda PRIVATE TORCH_EXTENSION_NAME=selective_scan_cuda)
+target_compile_definitions(selective_scan_cuda PRIVATE TORCH_EXTENSION_NAME=selective_scan_cuda USE_ROCM)
 
 add_executable(bug1 EXCLUDE_FROM_ALL bug1.hip)
 target_link_libraries(bug1 PRIVATE hip::host)

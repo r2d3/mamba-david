@@ -11,4 +11,3 @@ template void selective_scan_fwd_cuda<at::Half, complex_t>(SSMParamsBase &params
 
 template void selective_scan_fwd_cuda<float, float>(SSMParamsBase& params, hipStream_t stream);
 template void selective_scan_fwd_cuda<float, complex_t>(SSMParamsBase& params, hipStream_t stream);
-

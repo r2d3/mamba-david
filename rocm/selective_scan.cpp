@@ -52,10 +52,8 @@
 template<typename input_t, typename weight_t>
 void selective_scan_fwd_cuda(SSMParamsBase &params, hipStream_t stream);
 
-#if 0
 template <typename input_t, typename weight_t>
 void selective_scan_bwd_cuda(SSMParamsBwd &params, hipStream_t stream);
-#endif
 
 void set_ssm_params_fwd(SSMParamsBase &params,
                         // sizes
@@ -477,7 +475,6 @@ selective_scan_bwd(const at::Tensor &u, const at::Tensor &delta,
                        delta_bias_.has_value() ? ddelta_bias.data_ptr() : nullptr,
                        has_z, delta_softplus, recompute_out_z);
 
-#if 0
     // Otherwise the kernel will be launched from cuda:0 device
     // Cast to char to avoid compiler warning about narrowing
     at::cuda::HIPGuard device_guard{(char)u.get_device()};
@@ -487,7 +484,6 @@ selective_scan_bwd(const at::Tensor &u, const at::Tensor &delta,
             selective_scan_bwd_cuda<input_t, weight_t>(params, stream);
         });
     });
-#endif
     std::vector<at::Tensor> result = {du, ddelta, dA, dB.to(B.dtype()), dC.to(C.dtype()), dD, ddelta_bias};
     if (has_z) { result.push_back(dz); }
     if (recompute_out_z) { result.push_back(out_z); }
