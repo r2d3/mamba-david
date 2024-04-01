@@ -31,11 +31,11 @@ find_package(PythonInterp REQUIRED)
 
 # Find Python site-packages
 execute_process(
-  COMMAND "${PYTHON_EXECUTABLE}" -c "import site; print(site.getsitepackages()[0])"
-  OUTPUT_VARIABLE PYTHON_SITE
+  COMMAND dirname \$("${PYTHON_EXECUTABLE}" -c "import torch; print(torch.__file__)")
+  OUTPUT_VARIABLE PT
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 
-set(PT "${PYTHON_SITE}/torch")
+#set(PT "${PYTHON_SITE}/torch")
 message(STATUS "Using torch library from: ${PT}")
 include_directories(${PT}/include ${PT}/include/torch/csrc/api/include)
 link_directories(${PT}/lib)
